@@ -1,0 +1,29 @@
+{
+  "name": "orion-eod-report",
+  "version": "0.1.0",
+  "description": "Automated End-of-Day Slack report combining Time Doctor, Notion, and Slack.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "connftest": "tsx src/index.ts connftest",
+    "report": "tsx src/index.ts report",
+    "report:dry": "tsx src/index.ts report --dry-run",
+    "report:now": "tsx src/index.ts report --force",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "@slack/web-api": "^7.8.0",
+    "dotenv": "^16.4.7",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
