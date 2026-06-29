@@ -1,6 +1,6 @@
 import type { KnownBlock } from "@slack/web-api";
 import type { EodReport, ReportCard } from "../../domain/types.js";
-import { secondsToHm } from "../../utils/time.js";
+import { secondsToHm, cycleRangeLabel } from "../../utils/time.js";
 
 /** Escape Slack mrkdwn special characters in user-supplied text. */
 function esc(s: string): string {
@@ -53,19 +53,28 @@ export function renderSlack(report: EodReport): { blocks: KnownBlock[]; text: st
   }
 
   for (const group of report.groups) {
-    const count = group.cards.length;
-    const countLabel = `${count} card${count === 1 ? "" : "s"}`;
     blocks.push({ type: "divider" });
 
-    // Account header: a bold section so every account renders the same
-    // big/black text. Slack can't show a small inline logo next to bold text,
-    // so we use an emoji prefix (the account's own emoji icon if it has one,
-    // else a default building emoji).
+    // Account header: one bold/black section line with name + month/week totals.
+    // (Slack can't right-align or float text, so totals sit inline after the
+    // name; an emoji prefix uses the account's Notion emoji icon, else 🏢.)
     const emoji = group.icon?.kind === "emoji" ? group.icon.value : "🏢";
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `${emoji}  *${esc(group.account)}*  ·  *${countLabel}*` },
-    });
+    let headerText = `${emoji}  *${esc(group.account)}*`;
+    if (group.totals) {
+      const cycle = cycleRangeLabel(group.totals.cycleStartDay);
+      headerText +=
+        `  ·  *Hours this Month (${cycle}): ${secondsToHm(group.totals.monthSeconds)}*` +
+        `  ·  *Hours this Week: ${secondsToHm(group.totals.weekSeconds)}*`;
+    }
+    blocks.push({ type: "section", text: { type: "mrkdwn", text: headerText } });
+
+    if (group.cards.length === 0) {
+      blocks.push({
+        type: "section",
+        text: { type: "mrkdwn", text: "_No cards worked today._" },
+      });
+      continue;
+    }
 
     for (const card of group.cards) {
       blocks.push(cardBlock(card));

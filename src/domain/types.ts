@@ -36,11 +36,23 @@ export interface AccountIcon {
   value: string;
 }
 
+/** Per-account tracked-hour totals (null when the account has no defined cycle). */
+export interface AccountTotals {
+  /** Seconds tracked this billing cycle (account-specific month). */
+  monthSeconds: number;
+  /** Seconds tracked this week (Mon–Sun). */
+  weekSeconds: number;
+  /** Billing-cycle start day-of-month (e.g. 8 → cycle runs 8th–7th). */
+  cycleStartDay: number;
+}
+
 /** Cards grouped under one account, as rendered in the report. */
 export interface AccountGroup {
   account: string;
   /** Client icon (Notion page icon), or null to fall back to a default emoji. */
   icon: AccountIcon | null;
+  /** Month-cycle + weekly totals, or null if no billing cycle is configured. */
+  totals: AccountTotals | null;
   cards: ReportCard[];
 }
 

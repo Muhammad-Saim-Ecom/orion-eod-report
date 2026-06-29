@@ -1,13 +1,29 @@
 import { getConfig } from "../../config/env.js";
 import { logger } from "../../utils/logger.js";
-import { dayWindow, daysAgoIso, formatReportDate } from "../../utils/time.js";
+import {
+  dayWindow,
+  daysAgoIso,
+  formatReportDate,
+  billingCycleWindow,
+  currentWeekWindow,
+} from "../../utils/time.js";
 import { NotionClient } from "../../integrations/notion/client.js";
 import { TimeDoctorClient } from "../../integrations/timedoctor/client.js";
-import { getTrackedToday } from "../timedoctor/trackedToday.js";
+import {
+  getTrackedToday,
+  sumProjectInWindow,
+  type ProjectWorklogPoint,
+} from "../timedoctor/trackedToday.js";
 import { getCardsForAccounts, sumSubcardDurations } from "../notion/cards.js";
 import { matchCards } from "../matching/matchCards.js";
 import { mapWithConcurrency } from "../../utils/concurrency.js";
-import type { EodReport, ReportCard, AccountGroup, AccountIcon } from "../../domain/types.js";
+import type {
+  EodReport,
+  ReportCard,
+  AccountGroup,
+  AccountIcon,
+  AccountTotals,
+} from "../../domain/types.js";
 
 /**
  * Orchestrates the full data pipeline and produces the assembled report:
@@ -37,8 +53,7 @@ export async function buildReport(): Promise<EodReport> {
   });
 
   if (tracked.tasks.length === 0) {
-    logger.info("No tracked work today on the target accounts.");
-    return { dateLabel, localDate: win.localDate, groups: [], fyiUserIds: cfg.REPORT_FYI_USER_IDS };
+    logger.info("No tracked work today on the target accounts (showing all accounts as empty).");
   }
 
   // 2. Notion: cards for the target accounts.
@@ -71,9 +86,52 @@ export async function buildReport(): Promise<EodReport> {
     timeDoctorProjectId: task.projectId,
   }));
 
-  // 4. Group by account, preserving the configured account order.
-  const groups = groupByAccount(reportCards, cfg.REPORT_ACCOUNTS, icons);
+  // 4. Per-account month-cycle + weekly totals (from the worklog already swept).
+  const totals = computeAccountTotals(
+    tracked.projectNames,
+    tracked.projectPoints,
+    cfg.REPORT_CYCLE_START_DAYS,
+    cfg.REPORT_TIMEZONE,
+  );
+
+  // 5. Group by account, preserving the configured account order.
+  const groups = groupByAccount(reportCards, cfg.REPORT_ACCOUNTS, icons, totals);
   return { dateLabel, localDate: win.localDate, groups, fyiUserIds: cfg.REPORT_FYI_USER_IDS };
+}
+
+/**
+ * For each account with a configured billing-cycle start day, sum its Time
+ * Doctor project's tracked seconds over (a) the current billing cycle and
+ * (b) the current week. Accounts without a cycle get no totals (null).
+ */
+function computeAccountTotals(
+  projectNames: Map<string, string>,
+  points: ProjectWorklogPoint[],
+  cycleStartDays: Record<string, number>,
+  timeZone: string,
+): Map<string, AccountTotals> {
+  const nameToProjectId = new Map<string, string>();
+  for (const [id, name] of projectNames) nameToProjectId.set(name, id);
+
+  const week = currentWeekWindow(timeZone);
+  const weekFrom = new Date(week.fromIso).getTime();
+  const weekTo = new Date(week.toIso).getTime();
+
+  const out = new Map<string, AccountTotals>();
+  for (const [account, startDay] of Object.entries(cycleStartDays)) {
+    const projectId = nameToProjectId.get(account);
+    if (!projectId) continue;
+    const cycle = billingCycleWindow(timeZone, startDay);
+    const monthSeconds = sumProjectInWindow(
+      points,
+      projectId,
+      new Date(cycle.fromIso).getTime(),
+      new Date(cycle.toIso).getTime(),
+    );
+    const weekSeconds = sumProjectInWindow(points, projectId, weekFrom, weekTo);
+    out.set(account, { monthSeconds, weekSeconds, cycleStartDay: startDay });
+  }
+  return out;
 }
 
 /** Group cards by account, ordered by the configured account list (then alpha). */
@@ -81,6 +139,7 @@ function groupByAccount(
   cards: ReportCard[],
   accountOrder: string[],
   icons: Map<string, AccountIcon>,
+  totals: Map<string, AccountTotals>,
 ): AccountGroup[] {
   const byAccount = new Map<string, ReportCard[]>();
   for (const c of cards) {
@@ -89,12 +148,18 @@ function groupByAccount(
     byAccount.set(c.account, list);
   }
 
+  // Always emit a group for EVERY configured account, even with no cards today
+  // (empty groups render a "no cards worked today" message). Also include any
+  // account that had cards but somehow isn't in the configured list.
+  const allAccounts = new Set<string>([...accountOrder, ...byAccount.keys()]);
+
   const order = new Map(accountOrder.map((a, i) => [a, i]));
-  const groups: AccountGroup[] = [...byAccount.entries()].map(([account, cs]) => ({
+  const groups: AccountGroup[] = [...allAccounts].map((account) => ({
     account,
     icon: icons.get(account) ?? null,
+    totals: totals.get(account) ?? null,
     // Within an account, show the most-tracked card first.
-    cards: cs.sort((a, b) => b.trackedSeconds - a.trackedSeconds),
+    cards: (byAccount.get(account) ?? []).sort((a, b) => b.trackedSeconds - a.trackedSeconds),
   }));
 
   groups.sort((a, b) => {

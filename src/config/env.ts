@@ -51,6 +51,13 @@ const envSchema = z
       .transform((v) => v === "true"),
     // Slack user ID (U…) to DM when a scheduled run fails (optional).
     ALERT_SLACK_USER_ID: emptyToUndefined(z.string().optional()),
+    // Per-account billing-cycle start day, JSON: {"Account Name": dayOfMonth}.
+    // Accounts not listed simply omit the month/week totals.
+    REPORT_CYCLE_START_DAYS: emptyToUndefined(z.string().optional()).transform((s) => {
+      if (!s) return {} as Record<string, number>;
+      const parsed = JSON.parse(s) as Record<string, number>;
+      return parsed;
+    }),
   })
   .superRefine((val, ctx) => {
     const hasToken = !!val.TD_TOKEN;

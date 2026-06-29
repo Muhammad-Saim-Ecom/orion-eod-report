@@ -1,5 +1,5 @@
 import type { EodReport } from "../../domain/types.js";
-import { secondsToHm } from "../../utils/time.js";
+import { secondsToHm, cycleRangeLabel } from "../../utils/time.js";
 
 /** Format estimated hours like the report ("7h" or "N/A"). */
 function estLabel(hours: number | null): string {
@@ -32,7 +32,20 @@ export function renderConsole(report: EodReport): string {
 
   for (const group of report.groups) {
     lines.push("");
-    lines.push(`Account: ${group.account}`);
+    let header = `Account: ${group.account}`;
+    if (group.totals) {
+      const cycle = cycleRangeLabel(group.totals.cycleStartDay);
+      header +=
+        `  ·  Hours this Month (${cycle}): ${secondsToHm(group.totals.monthSeconds)}` +
+        `  ·  Hours this Week: ${secondsToHm(group.totals.weekSeconds)}`;
+    }
+    lines.push(header);
+
+    if (group.cards.length === 0) {
+      lines.push("  No cards worked today.");
+      continue;
+    }
+
     for (const card of group.cards) {
       lines.push("");
       lines.push(`  Card: ${card.title}  <${card.url}>`);

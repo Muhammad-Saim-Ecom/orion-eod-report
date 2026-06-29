@@ -16,11 +16,26 @@ export interface TrackedTask {
   userIds: string[];
 }
 
+/** A minimal worklog datum, for computing per-project windowed totals. */
+export interface ProjectWorklogPoint {
+  projectId: string;
+  /** Entry start time, epoch ms. */
+  startMs: number;
+  /** Seconds tracked. */
+  seconds: number;
+}
+
 export interface TrackedTodayResult {
   /** Tasks that had any tracked time today, on the target projects. */
   tasks: TrackedTask[];
   /** Map of projectId → project (account) name, for the target projects. */
   projectNames: Map<string, string>;
+  /**
+   * All target-project worklog points within the swept window. Lets callers
+   * sum per-project totals for any sub-window (billing cycle, current week)
+   * without extra API calls.
+   */
+  projectPoints: ProjectWorklogPoint[];
 }
 
 /**
@@ -78,11 +93,22 @@ export async function getTrackedToday(args: {
     string,
     { seconds: number; projectId: string; userIds: Set<string> }
   >();
+  const projectPoints: ProjectWorklogPoint[] = [];
 
   await mapWithConcurrency(users, 8, async (user) => {
     const entries = await td.getUserWorklog(user.id, cumulativeFromIso, todayToIso);
     for (const e of entries) {
-      if (!e.taskId || !e.projectId || !targetProjectIds.has(e.projectId)) continue;
+      if (!e.projectId || !targetProjectIds.has(e.projectId)) continue;
+
+      // Per-project point for windowed totals (includes entries with no taskId,
+      // so account-level cycle/week totals capture ALL time on the project).
+      projectPoints.push({
+        projectId: e.projectId,
+        startMs: new Date(e.start).getTime(),
+        seconds: e.time,
+      });
+
+      if (!e.taskId) continue;
 
       // Cumulative bucket (whole span, all users).
       const agg = cumulativeByTask.get(e.taskId) ?? {
@@ -132,5 +158,21 @@ export async function getTrackedToday(args: {
   }
 
   tasks.sort((a, b) => b.secondsToday - a.secondsToday);
-  return { tasks, projectNames };
+  return { tasks, projectNames, projectPoints };
+}
+
+/** Sum seconds for a project within [fromMs, toMs). */
+export function sumProjectInWindow(
+  points: ProjectWorklogPoint[],
+  projectId: string,
+  fromMs: number,
+  toMs: number,
+): number {
+  let total = 0;
+  for (const p of points) {
+    if (p.projectId === projectId && p.startMs >= fromMs && p.startMs < toMs) {
+      total += p.seconds;
+    }
+  }
+  return total;
 }
