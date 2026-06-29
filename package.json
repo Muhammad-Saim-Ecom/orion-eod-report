@@ -12,6 +12,8 @@
     "report": "tsx src/index.ts report",
     "report:dry": "tsx src/index.ts report --dry-run",
     "report:now": "tsx src/index.ts report --force",
+    "cleanup": "tsx src/index.ts cleanup",
+    "cleanup:last": "tsx src/index.ts cleanup:last",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

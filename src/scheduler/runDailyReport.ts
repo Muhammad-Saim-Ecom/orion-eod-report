@@ -33,11 +33,13 @@ export async function runDailyReport(opts: RunOptions = {}): Promise<EodReport |
       return null;
     }
     // We schedule two UTC crons (one for EST, one for EDT) so the run always
-    // lands at 5 PM local. Only the cron matching the current local 5 PM hour
-    // should proceed; the other is a no-op for that part of the year.
+    // lands at the target local hour. Only the cron matching the current local
+    // post hour proceeds; the other is a no-op for that part of the year.
     const hour = localHour(cfg.REPORT_TIMEZONE);
-    if (hour !== 17) {
-      logger.info(`Skipping report: local hour is ${hour}:00, not 17:00. (DST guard.)`);
+    if (hour !== cfg.REPORT_POST_HOUR) {
+      logger.info(
+        `Skipping report: local hour is ${hour}:00, not ${cfg.REPORT_POST_HOUR}:00. (post-hour guard)`,
+      );
       return null;
     }
   }

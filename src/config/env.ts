@@ -40,6 +40,9 @@ const envSchema = z
       .min(1, "REPORT_ACCOUNTS is required")
       .transform((s) => s.split(",").map((a) => a.trim()).filter(Boolean)),
     TRACKED_FALLBACK_DAYS: z.coerce.number().int().positive().default(90),
+    // Local hour (0–23) at which the scheduled run is allowed to post.
+    // Defaults to 17 (5 PM). Used to align with the workflow's trigger time.
+    REPORT_POST_HOUR: z.coerce.number().int().min(0).max(23).default(17),
     // Comma-separated Slack user IDs (U…) to @-mention in the footer (optional).
     REPORT_FYI_USER_IDS: emptyToUndefined(z.string().optional()).transform((s) =>
       (s ?? "").split(",").map((id) => id.trim()).filter(Boolean),

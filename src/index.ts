@@ -26,6 +26,12 @@ async function main(): Promise<void> {
     case "notion:cards":
       await notionCardsDebug();
       break;
+    case "cleanup":
+      await cleanupOwnMessages(rest);
+      break;
+    case "cleanup:last":
+      await cleanupLastOwnMessage();
+      break;
     case "report":
       await runReportCommand({
         dryRun: rest.includes("--dry-run"),
@@ -33,8 +39,32 @@ async function main(): Promise<void> {
       });
       break;
     default:
-      logger.info("Usage: <connftest | td:today | notion:cards | report [--dry-run] [--force]>");
+      logger.info(
+        "Usage: <connftest | td:today | notion:cards | report [--dry-run] [--force] | cleanup [N] | cleanup:last>",
+      );
       process.exitCode = 1;
+  }
+}
+
+/** Delete the bot's own recent messages in the configured channel. */
+async function cleanupOwnMessages(rest: string[]): Promise<void> {
+  const cfg = getConfig();
+  const limit = Number(rest.find((a) => /^\d+$/.test(a))) || 50;
+  const slack = new SlackClient(cfg.SLACK_BOT_TOKEN, cfg.SLACK_CHANNEL_ID);
+  logger.info(`Cleaning up bot messages in ${cfg.SLACK_CHANNEL_ID} (scanning last ${limit})…`);
+  const deleted = await slack.deleteOwnMessages(cfg.SLACK_CHANNEL_ID, limit);
+  logger.info(`Deleted ${deleted} message(s).`);
+}
+
+/** Delete only the single most-recent bot message in the configured channel. */
+async function cleanupLastOwnMessage(): Promise<void> {
+  const cfg = getConfig();
+  const slack = new SlackClient(cfg.SLACK_BOT_TOKEN, cfg.SLACK_CHANNEL_ID);
+  const text = await slack.deleteLastOwnMessage(cfg.SLACK_CHANNEL_ID);
+  if (text === null) {
+    logger.info(`No recent bot message found in ${cfg.SLACK_CHANNEL_ID}.`);
+  } else {
+    logger.info(`Deleted last bot message in ${cfg.SLACK_CHANNEL_ID}: "${text.slice(0, 80)}"`);
   }
 }
 

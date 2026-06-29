@@ -1,19 +1,25 @@
 name: EOD Report
 
-# Posts the End-of-Day report at 5:00 PM America/New_York, Monday–Friday.
+# ─────────────────────────────────────────────────────────────────────────
+# WHEN THIS RUNS — edit the time here.
 #
-# GitHub cron is UTC and has no timezone/DST awareness, so we trigger at BOTH
-# 21:00 UTC (= 5 PM EDT, ~Mar–Nov) and 22:00 UTC (= 5 PM EST, ~Nov–Mar). The
-# app's own DST guard (localHour === 17) ensures only the correct one posts;
-# the other run is a no-op. Mon–Fri is enforced both here and in code.
+# Cron format is:  "MINUTE HOUR * * 1-5"   (times are in UTC, Mon–Fri).
+# Eastern Time is UTC minus 4 (summer/EDT) or minus 5 (winter/EST).
+#   • 5:00 PM EDT  = 21:00 UTC  → "0 21 * * 1-5"
+#   • 5:00 PM EST  = 22:00 UTC  → "0 22 * * 1-5"
+# Also set the GitHub Variable REPORT_POST_HOUR to the local hour you expect
+# (e.g. 17 for 5 PM). The app only posts when the local hour matches it.
+#
+# >>> TEST MODE (2026-06-29): firing at 22:07 UTC = 6:07 PM ET. <<<
+#     Set REPORT_POST_HOUR variable to 18 for this test, then change back to 17.
+# ─────────────────────────────────────────────────────────────────────────
 on:
   schedule:
-    - cron: "0 21 * * 1-5" # 5 PM EDT
-    - cron: "0 22 * * 1-5" # 5 PM EST
-  workflow_dispatch: # allow manual runs from the Actions tab
+    - cron: "7 22 * * 1-5" # TEST: 6:07 PM EDT
+  workflow_dispatch: # lets you run it manually from the Actions tab
     inputs:
       force:
-        description: "Run even if not a weekday / 5 PM (true/false)"
+        description: "Run even if not a weekday / scheduled hour (true/false)"
         required: false
         default: "false"
 
@@ -47,6 +53,7 @@ jobs:
           REPORT_TIMEZONE: ${{ vars.REPORT_TIMEZONE || 'America/New_York' }}
           REPORT_ACCOUNTS: ${{ vars.REPORT_ACCOUNTS }}
           TRACKED_FALLBACK_DAYS: ${{ vars.TRACKED_FALLBACK_DAYS || '90' }}
+          REPORT_POST_HOUR: ${{ vars.REPORT_POST_HOUR || '17' }}
           REPORT_FYI_USER_IDS: ${{ vars.REPORT_FYI_USER_IDS }}
           REPORT_CYCLE_START_DAYS: ${{ vars.REPORT_CYCLE_START_DAYS }}
           SKIP_US_HOLIDAYS: ${{ vars.SKIP_US_HOLIDAYS || 'false' }}
