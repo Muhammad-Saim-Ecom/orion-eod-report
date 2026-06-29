@@ -48,6 +48,7 @@ jobs:
           REPORT_ACCOUNTS: ${{ vars.REPORT_ACCOUNTS }}
           TRACKED_FALLBACK_DAYS: ${{ vars.TRACKED_FALLBACK_DAYS || '90' }}
           REPORT_FYI_USER_IDS: ${{ vars.REPORT_FYI_USER_IDS }}
+          REPORT_CYCLE_START_DAYS: ${{ vars.REPORT_CYCLE_START_DAYS }}
           SKIP_US_HOLIDAYS: ${{ vars.SKIP_US_HOLIDAYS || 'false' }}
           ALERT_SLACK_USER_ID: ${{ secrets.ALERT_SLACK_USER_ID }}
           LOG_LEVEL: info
