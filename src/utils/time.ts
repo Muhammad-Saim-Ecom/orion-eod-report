@@ -170,10 +170,14 @@ export function ordinal(n: number): string {
   }
 }
 
-/** Cycle label like "8th to 7th" for a cycle starting on `startDay`. */
+/**
+ * Cycle label like "8th to 7th" for a cycle starting on `startDay`.
+ * For a full calendar month (start day 1) the end day varies (28–31), so we
+ * label it "1st to last" rather than hard-coding a day.
+ */
 export function cycleRangeLabel(startDay: number): string {
-  const endDay = startDay === 1 ? 31 : startDay - 1;
-  return `${ordinal(startDay)} to ${ordinal(endDay)}`;
+  if (startDay === 1) return "1st to last";
+  return `${ordinal(startDay)} to ${ordinal(startDay - 1)}`;
 }
 
 /** Convert seconds to a compact "Xh Ym" string (e.g. 30185 -> "8h 23m"). */
