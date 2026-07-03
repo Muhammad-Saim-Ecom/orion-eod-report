@@ -113,14 +113,11 @@ function computeAccountTotals(
   const nameToProjectId = new Map<string, string>();
   for (const [id, name] of projectNames) nameToProjectId.set(name, id);
 
-  const week = currentWeekWindow(timeZone);
-  const weekFrom = new Date(week.fromIso).getTime();
-  const weekTo = new Date(week.toIso).getTime();
-
   const out = new Map<string, AccountTotals>();
   for (const [account, startDay] of Object.entries(cycleStartDays)) {
     const projectId = nameToProjectId.get(account);
     if (!projectId) continue;
+
     const cycle = billingCycleWindow(timeZone, startDay);
     const monthSeconds = sumProjectInWindow(
       points,
@@ -128,7 +125,17 @@ function computeAccountTotals(
       new Date(cycle.fromIso).getTime(),
       new Date(cycle.toIso).getTime(),
     );
-    const weekSeconds = sumProjectInWindow(points, projectId, weekFrom, weekTo);
+
+    // Weekly window is clamped to this account's cycle start so it never
+    // counts days from before the cycle began (e.g. a mid-week 1st).
+    const week = currentWeekWindow(timeZone, new Date(), cycle.fromIso);
+    const weekSeconds = sumProjectInWindow(
+      points,
+      projectId,
+      new Date(week.fromIso).getTime(),
+      new Date(week.toIso).getTime(),
+    );
+
     out.set(account, { monthSeconds, weekSeconds, cycleStartDay: startDay });
   }
   return out;

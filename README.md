@@ -54,8 +54,20 @@ See `.env.example` for every required variable.
 ```bash
 npm run connftest    # verify Slack + Notion + Time Doctor connectivity
 npm run report:dry   # run the report, printing to console (no Slack post)
-npm run report       # run the report and post to Slack
+npm run report:now   # post to Slack immediately (ignores the weekday / 5 PM guard)
+npm run report       # scheduler behaviour: only posts Mon–Fri at 5 PM ET
 npm run typecheck    # strict TypeScript check
+```
+
+### Deleting the bot's messages
+
+These act on the bot's own messages in whatever channel `SLACK_CHANNEL_ID`
+points to (they never touch other users' messages):
+
+```bash
+npm run cleanup:last   # delete ONLY the most recent message the bot posted
+npm run cleanup        # delete the bot's last 50 messages
+npm run cleanup 100    # delete the bot's last 100 messages
 ```
 
 ## Status

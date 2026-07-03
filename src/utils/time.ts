@@ -130,10 +130,16 @@ export function billingCycleWindow(
 /**
  * The current week (Monday–Sunday) as UTC ISO [from, to), anchored to local
  * midnight in `timeZone`. `to` is next Monday (exclusive).
+ *
+ * If `cycleStartIso` is given and the week's Monday falls before it, the start
+ * is clamped up to the cycle start — so the weekly total never counts days
+ * from before the account's billing cycle began (e.g. a month that starts
+ * mid-week: the first week runs from the 1st through the coming Sunday).
  */
 export function currentWeekWindow(
   timeZone: string,
   now: Date = new Date(),
+  cycleStartIso?: string,
 ): { fromIso: string; toIso: string } {
   const p = zonedParts(now, timeZone);
   const todayMidnight = zonedMidnightUtc(p.year, p.month, p.day, timeZone);
@@ -149,8 +155,14 @@ export function currentWeekWindow(
     Sun: 6,
   };
   const offset = daysSinceMon[wkName] ?? 0;
-  const start = new Date(todayMidnight.getTime() - offset * 24 * 60 * 60 * 1000);
+  let start = new Date(todayMidnight.getTime() - offset * 24 * 60 * 60 * 1000);
   const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  // Clamp the start forward to the cycle start if the week began earlier.
+  if (cycleStartIso) {
+    const cycleStart = new Date(cycleStartIso).getTime();
+    if (start.getTime() < cycleStart) start = new Date(cycleStart);
+  }
   return { fromIso: start.toISOString(), toIso: end.toISOString() };
 }
 
