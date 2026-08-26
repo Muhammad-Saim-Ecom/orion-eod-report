@@ -95,7 +95,9 @@ export async function getTrackedToday(args: {
   >();
   const projectPoints: ProjectWorklogPoint[] = [];
 
-  await mapWithConcurrency(users, 8, async (user) => {
+  // Concurrency kept modest (4) to stay under Time Doctor's rate limit; the
+  // http layer additionally backs off on 429 with Retry-After.
+  await mapWithConcurrency(users, 4, async (user) => {
     const entries = await td.getUserWorklog(user.id, cumulativeFromIso, todayToIso);
     for (const e of entries) {
       if (!e.projectId || !targetProjectIds.has(e.projectId)) continue;

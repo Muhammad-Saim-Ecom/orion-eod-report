@@ -8,7 +8,7 @@ export interface RequestOptions {
   retries?: number;
 }
 
-const DEFAULT_RETRIES = 3;
+const DEFAULT_RETRIES = 6;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,7 +46,12 @@ export async function requestJson<T>(url: string, opts: RequestOptions = {}): Pr
       const transient = res.status === 429 || res.status >= 500;
       const text = await res.text().catch(() => "");
       if (transient && attempt < retries) {
-        const wait = 2 ** attempt * 500;
+        // Honor Retry-After if the server sends it (seconds); else exponential
+        // backoff. Rate limits (429) get a longer floor so we back off hard.
+        const retryAfter = Number(res.headers.get("retry-after"));
+        const backoff = 2 ** attempt * 1000;
+        const floor = res.status === 429 ? 3000 : 0;
+        const wait = retryAfter > 0 ? retryAfter * 1000 : Math.max(backoff, floor);
         logger.warn(`HTTP ${res.status} on ${redact(url)}; retrying in ${wait}ms`, text.slice(0, 200));
         await sleep(wait);
         continue;
